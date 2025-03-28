@@ -37,7 +37,7 @@ const EmployeeMessages = ({ employeeId, employeeName }: EmployeeMessagesProps) =
       let unread = 0;
       
       querySnapshot.forEach(docSnapshot => {
-        const messageData = docSnapshot.data() as Message;
+        const messageData = docSnapshot.data();
         if (!messageData.read) {
           unread++;
         }
@@ -45,9 +45,9 @@ const EmployeeMessages = ({ employeeId, employeeName }: EmployeeMessagesProps) =
         // Only add unread messages if the filter is active
         if (!showUnreadOnly || !messageData.read) {
           msgs.push({
-            id: docSnapshot.id,
-            ...messageData
-          });
+            ...messageData,
+            id: docSnapshot.id
+          } as Message);
         }
       });
       
