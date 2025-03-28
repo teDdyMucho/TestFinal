@@ -4,6 +4,10 @@
 
 @layer base {
   :root {
+    --font-family: Inter, sans-serif;
+    --base-font-size: 1rem;
+    --custom-text-color: #ffffff;
+    
     --background: 0 0% 90%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 90%;
@@ -46,6 +50,74 @@
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;
+  }
+
+  /* Apply custom font family and size to all elements */
+  * {
+    font-family: var(--font-family);
+    font-size: var(--base-font-size);
+  }
+
+  /* Apply custom text color when enabled */
+  .custom-text-color {
+    color: var(--custom-text-color) !important;
+  }
+  
+  .custom-text-color h1,
+  .custom-text-color h2,
+  .custom-text-color h3,
+  .custom-text-color h4,
+  .custom-text-color h5,
+  .custom-text-color h6,
+  .custom-text-color p,
+  .custom-text-color span,
+  .custom-text-color div,
+  .custom-text-color button {
+    color: var(--custom-text-color) !important;
+  }
+  
+  /* Font size adjustments for headings */
+  h1 {
+    font-size: calc(var(--base-font-size) * 2);
+  }
+  
+  h2 {
+    font-size: calc(var(--base-font-size) * 1.75);
+  }
+  
+  h3 {
+    font-size: calc(var(--base-font-size) * 1.5);
+  }
+  
+  h4 {
+    font-size: calc(var(--base-font-size) * 1.25);
+  }
+  
+  h5 {
+    font-size: calc(var(--base-font-size) * 1.1);
+  }
+  
+  h6 {
+    font-size: var(--base-font-size);
+  }
+  
+  /* Responsive font size adjustments */
+  @media (max-width: 640px) {
+    h1 {
+      font-size: calc(var(--base-font-size) * 1.75);
+    }
+    
+    h2 {
+      font-size: calc(var(--base-font-size) * 1.5);
+    }
+    
+    h3 {
+      font-size: calc(var(--base-font-size) * 1.25);
+    }
+    
+    h4, h5, h6 {
+      font-size: var(--base-font-size);
+    }
   }
 }
 

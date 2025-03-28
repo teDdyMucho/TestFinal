@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Employee } from "@/types/employee";
 import { motion } from "framer-motion";
-import { Clock, User, RefreshCw } from "lucide-react";
+import { Clock, User, RefreshCw, Search } from "lucide-react";
 
 interface AttendanceRecordsProps {
   employees: Employee[];
@@ -19,10 +20,15 @@ const AttendanceRecords = ({
   onRefresh 
 }: AttendanceRecordsProps) => {
   const [selectedDepartment, setSelectedDepartment] = useState<string | "all">("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
-  const filteredEmployees = selectedDepartment === "all" 
-    ? employees 
-    : employees.filter(emp => emp.department === selectedDepartment);
+  const filteredEmployees = employees
+    .filter(emp => selectedDepartment === "all" || emp.department === selectedDepartment)
+    .filter(emp => 
+      searchQuery === "" || 
+      emp.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      emp.employeeId.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   const handleEmployeeClick = (employee: Employee) => {
     onViewAttendance(employee);
@@ -58,6 +64,18 @@ const AttendanceRecords = ({
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-white/50" />
+          </div>
+          <Input
+            type="text"
+            placeholder="Search by name or ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-white/10 border-white/20 text-white placeholder:text-white/50 pl-10"
+          />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredEmployees.map(employee => (
             <motion.button

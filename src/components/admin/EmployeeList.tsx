@@ -6,7 +6,7 @@ import { Employee } from "@/types/employee";
 import { collection, addDoc, doc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { motion } from "framer-motion";
-import { Users, Plus, Edit2, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Users, Plus, Edit2, Trash2, CheckCircle, XCircle, Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,7 +27,14 @@ const EmployeeList = ({ employees, departments, onUpdate }: EmployeeListProps) =
   });
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const { toast } = useToast();
+
+  const filteredEmployees = employees.filter(emp => 
+    searchQuery === "" || 
+    emp.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    emp.employeeId.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, type, checked, value } = e.target;
@@ -257,12 +264,25 @@ const EmployeeList = ({ employees, departments, onUpdate }: EmployeeListProps) =
             </div>
           </form>
 
+          <div className="relative mb-4">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-white/50" />
+            </div>
+            <Input
+              type="text"
+              placeholder="Search employees by name or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 pl-10"
+            />
+          </div>
+
           <motion.div 
             className="grid gap-3"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            {employees.map(employee => (
+            {filteredEmployees.map(employee => (
               <motion.div
                 key={employee.id}
                 whileHover={{ scale: 1.01 }}
