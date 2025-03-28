@@ -5,9 +5,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Department, EmployeeStatus } from "@/types/employee";
 import { formatTime } from "@/utils/formatTime";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface StatusCardProps {
   employeeStatus: EmployeeStatus;
@@ -59,7 +69,34 @@ export function StatusCard({
     status: string;
     bio?: string;
     department?: string;
+    departmentName?: string;
   }>>([]);
+  const [departments, setDepartments] = useState<Record<string, string>>({});
+  const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
+  const clockOutTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch all departments once
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "departments"));
+        const deptMap: Record<string, string> = {};
+        
+        querySnapshot.forEach((docSnapshot) => {
+          const data = docSnapshot.data();
+          if (data.name) {
+            deptMap[docSnapshot.id] = data.name;
+          }
+        });
+        
+        setDepartments(deptMap);
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+      }
+    };
+    
+    fetchDepartments();
+  }, []);
 
   useEffect(() => {
     // Subscribe to status changes to show who's on break
@@ -75,10 +112,11 @@ export function StatusCard({
         status: string;
         bio?: string;
         department?: string;
+        departmentName?: string;
       }> = [];
 
-      for (const doc of snapshot.docs) {
-        const statusData = doc.data();
+      for (const docSnapshot of snapshot.docs) {
+        const statusData = docSnapshot.data();
         const employeeId = statusData.employeeId;
 
         // Fetch employee details
@@ -90,12 +128,20 @@ export function StatusCard({
 
         if (!employeeSnapshot.empty) {
           const employeeData = employeeSnapshot.docs[0].data();
+          
+          // Get department name from our cached departments
+          let departmentName = "No department";
+          if (employeeData.department && departments[employeeData.department]) {
+            departmentName = departments[employeeData.department];
+          }
+          
           breakEmployees.push({
             id: employeeId,
             name: employeeData.name || "Unknown Employee",
             status: statusData.status,
             bio: employeeData.basicInfo?.bio || "No bio available",
-            department: employeeData.department
+            department: employeeData.department,
+            departmentName: departmentName
           });
         }
       }
@@ -104,7 +150,45 @@ export function StatusCard({
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [departments]);
+
+  // Set up automatic clock out based on department schedule
+  useEffect(() => {
+    if (employeeStatus.status !== "Clocked Out" && currentDepartment?.schedule?.clockOut) {
+      // Clear any existing timer
+      if (clockOutTimerRef.current) {
+        clearTimeout(clockOutTimerRef.current);
+      }
+      
+      // Set up new timer for automatic clock out
+      const [hours, minutes] = currentDepartment.schedule.clockOut.split(':');
+      const clockOutTime = new Date();
+      clockOutTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      
+      // If the time has already passed today, don't set a timer
+      const now = new Date();
+      if (clockOutTime <= now) {
+        return;
+      }
+      
+      const timeUntilClockOut = clockOutTime.getTime() - now.getTime();
+      
+      clockOutTimerRef.current = setTimeout(() => {
+        // Perform automatic clock out when the time comes
+        onClockOut();
+      }, timeUntilClockOut);
+    }
+    
+    return () => {
+      if (clockOutTimerRef.current) {
+        clearTimeout(clockOutTimerRef.current);
+      }
+    };
+  }, [employeeStatus.status, currentDepartment, onClockOut]);
+
+  const handleClockOutClick = () => {
+    setShowClockOutConfirm(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -216,7 +300,7 @@ export function StatusCard({
               ) : (
                 <>
                   <Button 
-                    onClick={onClockOut}
+                    onClick={handleClockOutClick}
                     variant="destructive" 
                     className="col-span-full h-14 text-lg mb-3"
                   >
@@ -305,7 +389,7 @@ export function StatusCard({
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                       <h3 className="font-medium text-lg">{employee.name}</h3>
-                      <p className="text-white/70 text-sm">{employee.department || "No department"}</p>
+                      <p className="text-white/70 text-sm">{employee.departmentName || "No department"}</p>
                     </div>
                     <Badge 
                       variant="secondary"
@@ -323,6 +407,29 @@ export function StatusCard({
           )}
         </CardContent>
       </Card>
+
+      {/* Clock Out Confirmation Dialog */}
+      <AlertDialog open={showClockOutConfirm} onOpenChange={setShowClockOutConfirm}>
+        <AlertDialogContent className="bg-gray-900 border border-white/20 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to clock out?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/70">
+              This action will end your current work session and record your attendance.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border border-white/20 text-white hover:bg-white/10">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={onClockOut}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Clock Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
