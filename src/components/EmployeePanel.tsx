@@ -26,6 +26,7 @@ import { HistoryCard } from "./employee/HistoryCard";
 import EmployeeMessages from "./EmployeeMessages";
 import { formatTime } from "@/utils/formatTime";
 import { checkAndUpdateDepartmentStatus } from '@/lib/scheduleChecker';
+import { Badge } from "@/components/ui/badge";
 
 interface LateStatus {
   isLate: boolean;
@@ -56,6 +57,7 @@ const EmployeePanel = () => {
   const [lateMinutes, setLateMinutes] = useState(0);
   const [isOvertime, setIsOvertime] = useState(false);
   const [overtimeMinutes, setOvertimeMinutes] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioRef2 = useRef<HTMLAudioElement>(null);
@@ -601,6 +603,44 @@ const EmployeePanel = () => {
     return () => clearInterval(scheduleInterval);
   }, []);
 
+  useEffect(() => {
+    if (!initialEmployee?.employeeId) return;
+
+    const fetchUnreadMessages = async () => {
+      try {
+        const q = query(
+          collection(db, "messages"),
+          where("recipientId", "in", [initialEmployee.employeeId, ""]),
+          where("read", "==", false)
+        );
+        const querySnapshot = await getDocs(q);
+        setUnreadMessageCount(querySnapshot.size);
+      } catch (error) {
+        console.error("Error fetching unread messages:", error);
+      }
+    };
+
+    fetchUnreadMessages();
+
+    const messagesQuery = query(
+      collection(db, "messages"),
+      where("recipientId", "in", [initialEmployee.employeeId, ""])
+    );
+
+    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+      let unreadCount = 0;
+      snapshot.forEach((doc) => {
+        const messageData = doc.data();
+        if (!messageData.read) {
+          unreadCount++;
+        }
+      });
+      setUnreadMessageCount(unreadCount);
+    });
+
+    return () => unsubscribe();
+  }, [initialEmployee?.employeeId]);
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600">
       <audio ref={audioRef} src="/buzz.wav" />
@@ -622,9 +662,17 @@ const EmployeePanel = () => {
                 <Clock className="w-4 h-4 mr-2" />
                 Attendance
               </TabsTrigger>
-              <TabsTrigger value="messages" className="data-[state=active]:bg-white/20 text-white">
+              <TabsTrigger value="messages" className="data-[state=active]:bg-white/20 text-white relative">
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Messages
+                {unreadMessageCount > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-2 -right-2 px-1.5 py-0.5 min-w-[1.5rem] h-5 flex items-center justify-center text-xs"
+                  >
+                    {unreadMessageCount}
+                  </Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger value="history" className="data-[state=active]:bg-white/20 text-white">
                 <History className="w-4 h-4 mr-2" />

@@ -8,7 +8,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Employee, AttendanceRecord, EmployeeStatus, Department } from "@/types/employee";
+import { Employee, AttendanceRecord, EmployeeStatus, Department, Message } from "@/types/employee";
 import { 
   Tabs, 
   TabsContent, 
@@ -44,6 +44,8 @@ const AdminPanel = () => {
     recentActivity: AttendanceRecord[];
   } | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
   const { toast } = useToast();
 
@@ -51,6 +53,7 @@ const AdminPanel = () => {
     fetchEmployees();
     fetchActiveEmployees();
     fetchDepartments();
+    fetchMessages();
 
     const unsubscribe = onSnapshot(
       collection(db, "status"),
@@ -82,7 +85,31 @@ const AdminPanel = () => {
       }
     );
 
-    return () => unsubscribe();
+    // Set up real-time listener for messages
+    const messagesUnsubscribe = onSnapshot(
+      collection(db, "messages"),
+      (snapshot) => {
+        const msgs: Message[] = [];
+        let unreadCount = 0;
+        
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.sender !== "Admin" && !data.read) {
+            unreadCount++;
+          }
+          msgs.push({ id: doc.id, ...data } as Message);
+        });
+        
+        msgs.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+        setMessages(msgs);
+        setUnreadMessageCount(unreadCount);
+      }
+    );
+
+    return () => {
+      unsubscribe();
+      messagesUnsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -140,6 +167,20 @@ const AdminPanel = () => {
       setDepartments(deps);
     } catch (error) {
       console.error("Error fetching departments:", error);
+    }
+  };
+
+  const fetchMessages = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "messages"));
+      const msgs: Message[] = [];
+      querySnapshot.forEach((doc) => {
+        msgs.push({ id: doc.id, ...doc.data() } as Message);
+      });
+      msgs.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+      setMessages(msgs);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
     }
   };
 
@@ -233,9 +274,14 @@ const AdminPanel = () => {
                 <Clock className="w-4 h-4 mr-2" />
                 Attendance
               </TabsTrigger>
-              <TabsTrigger value="messages" className="data-[state=active]:bg-white/20 text-white">
+              <TabsTrigger value="messages" className="data-[state=active]:bg-white/20 text-white relative">
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Messages
+                {unreadMessageCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadMessageCount}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger value="schedule" className="data-[state=active]:bg-white/20 text-white">
                 <Calendar className="w-4 h-4 mr-2" />
@@ -271,9 +317,9 @@ const AdminPanel = () => {
 
             <TabsContent value="messages">
               <AdminMessages 
-                messages={[]} 
+                messages={messages} 
                 employees={employees} 
-                onMessageSent={fetchEmployees} 
+                onMessageSent={fetchMessages} 
               />
             </TabsContent>
 
