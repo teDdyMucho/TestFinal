@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Message } from "@/types/employee";
-import { collection, query, where, getDocs, updateDoc, doc, Timestamp, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, updateDoc, doc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -36,8 +36,8 @@ const EmployeeMessages = ({ employeeId, employeeName }: EmployeeMessagesProps) =
       const msgs: Message[] = [];
       let unread = 0;
       
-      querySnapshot.forEach(doc => {
-        const messageData = doc.data() as Message;
+      querySnapshot.forEach(docSnapshot => {
+        const messageData = docSnapshot.data() as Message;
         if (!messageData.read) {
           unread++;
         }
@@ -45,9 +45,9 @@ const EmployeeMessages = ({ employeeId, employeeName }: EmployeeMessagesProps) =
         // Only add unread messages if the filter is active
         if (!showUnreadOnly || !messageData.read) {
           msgs.push({
-            id: doc.id,
+            id: docSnapshot.id,
             ...messageData
-          } as Message);
+          });
         }
       });
       
@@ -210,7 +210,7 @@ const EmployeeMessages = ({ employeeId, employeeName }: EmployeeMessagesProps) =
                       ) : (
                         <Button 
                           variant="outline" 
-                          size="sm"
+                          size="sm" 
                           onClick={() => setReplyingTo(message.id)}
                           className="border-white/20 text-white hover:bg-white/10"
                         >

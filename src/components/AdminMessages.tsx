@@ -153,11 +153,6 @@ const AdminMessages = ({ messages, employees, onMessageSent }: AdminMessagesProp
     }
   };
 
-  const handleSelectEmployee = (employeeId: string) => {
-    setSelectedEmployee(employeeId);
-    setActiveTab("conversations");
-  };
-
   const renderMessageItem = (message: Message, index: number) => (
     <motion.div
       key={message.id}
@@ -200,7 +195,7 @@ const AdminMessages = ({ messages, employees, onMessageSent }: AdminMessagesProp
             <p className="text-sm text-white/70">Reply:</p>
             <span className="font-medium text-white/90">{message.reply.message}</span>
           </div>
-          <span className="text-xs text-white/50">
+          <span className="text-xs text-white/50 mt-1 block">
             {message.reply.timestamp.toDate().toLocaleString()}
           </span>
         </motion.div>
@@ -213,18 +208,16 @@ const AdminMessages = ({ messages, employees, onMessageSent }: AdminMessagesProp
       <CardHeader>
         <CardTitle className="text-white flex items-center gap-2">
           <MessageSquare className="w-6 h-6" />
-          Manage Messages
+          Messages
         </CardTitle>
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-2 gap-1 bg-black/10 p-1 rounded-lg backdrop-blur-md mb-4">
-            <TabsTrigger value="compose" className="data-[state=active]:bg-white/20 text-white">
-              <Send className="w-4 h-4 mr-2" />
+          <TabsList className="w-full grid grid-cols-2 mb-6">
+            <TabsTrigger value="compose" className="data-[state=active]:bg-white/20">
               Compose Message
             </TabsTrigger>
-            <TabsTrigger value="conversations" className="data-[state=active]:bg-white/20 text-white">
-              <Users className="w-4 h-4 mr-2" />
+            <TabsTrigger value="conversations" className="data-[state=active]:bg-white/20">
               Conversations
               {conversations.reduce((total, conv) => total + conv.unreadCount, 0) > 0 && (
                 <Badge variant="destructive" className="ml-2">
@@ -233,171 +226,188 @@ const AdminMessages = ({ messages, employees, onMessageSent }: AdminMessagesProp
               )}
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="compose">
-            <form onSubmit={handleCreateMessage} className="grid gap-4">
-              <Select
-                value={newMessage.recipientId}
-                onValueChange={handleRecipientChange}
-              >
-                <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                  <SelectValue placeholder="Select recipient" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all_employees">All Employees</SelectItem>
-                  {employees.map(emp => (
-                    <SelectItem key={emp.employeeId} value={emp.employeeId}>
-                      {emp.name}
+          
+          <TabsContent value="compose" className="mt-0">
+            <form onSubmit={handleCreateMessage} className="space-y-4">
+              <div>
+                <label className="text-sm text-white/70 mb-2 block">
+                  Recipient
+                </label>
+                <Select 
+                  value={newMessage.recipientId} 
+                  onValueChange={handleRecipientChange}
+                >
+                  <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                    <SelectValue placeholder="Select recipient" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-900 border border-white/20 text-white">
+                    <SelectItem value="all_employees" className="focus:bg-white/10 focus:text-white">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        All Employees
+                      </div>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {employees.map(employee => (
+                      <SelectItem 
+                        key={employee.employeeId} 
+                        value={employee.employeeId}
+                        className="focus:bg-white/10 focus:text-white"
+                      >
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          {employee.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               
-              <textarea
-                name="message"
-                placeholder="Message"
-                value={newMessage.message}
-                onChange={handleMessageInputChange}
-                className="flex h-20 w-full rounded-md border bg-white/10 border-white/20 px-3 py-2 text-base text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 md:text-sm"
-              />
+              <div>
+                <label className="text-sm text-white/70 mb-2 block">
+                  Message
+                </label>
+                <textarea
+                  name="message"
+                  value={newMessage.message}
+                  onChange={handleMessageInputChange}
+                  placeholder="Type your message here..."
+                  className="w-full p-3 rounded-md bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                  rows={5}
+                  required
+                />
+              </div>
               
               <Button 
                 type="submit" 
-                className="bg-white/20 hover:bg-white/30 text-white border-0"
-                disabled={!newMessage.message.trim()}
+                className="w-full bg-white/20 hover:bg-white/30 text-white"
               >
                 <Send className="w-4 h-4 mr-2" />
                 Send Message
               </Button>
             </form>
           </TabsContent>
-
-          <TabsContent value="conversations">
+          
+          <TabsContent value="conversations" className="mt-0">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white/5 rounded-lg border border-white/10 p-2 md:col-span-1">
-                <div className="font-medium text-white p-2 border-b border-white/10 mb-2 flex items-center">
-                  <Users className="w-4 h-4 mr-2" />
-                  Employee Conversations
-                </div>
-                <div className="space-y-1 max-h-[400px] overflow-y-auto pr-1">
-                  <div 
-                    className={`p-2 rounded cursor-pointer flex items-center justify-between ${
-                      selectedEmployee === "all_employees" ? "bg-white/20" : "hover:bg-white/10"
+              <div className="md:col-span-1 space-y-2">
+                <h3 className="text-lg font-medium text-white mb-3">Conversations</h3>
+                
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+                  <Button 
+                    variant={selectedEmployee === null ? "default" : "outline"}
+                    className={`w-full justify-start ${
+                      selectedEmployee === null 
+                        ? 'bg-white/20 text-white' 
+                        : 'border-white/20 text-white hover:bg-white/10'
                     }`}
-                    onClick={() => setSelectedEmployee("all_employees")}
+                    onClick={() => setSelectedEmployee(null)}
                   >
-                    <div className="flex items-center">
-                      <Users className="w-4 h-4 mr-2 text-white/70" />
-                      <span className="text-white">All Employees</span>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        <span>All Employees</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4" />
                     </div>
-                    <ChevronRight className="w-4 h-4 text-white/50" />
-                  </div>
+                  </Button>
                   
-                  {conversations.map(conv => (
-                    <div 
-                      key={conv.employeeId}
-                      className={`p-2 rounded cursor-pointer flex items-center justify-between ${
-                        selectedEmployee === conv.employeeId ? "bg-white/20" : "hover:bg-white/10"
+                  {conversations.map(conversation => (
+                    <Button 
+                      key={conversation.employeeId}
+                      variant={selectedEmployee === conversation.employeeId ? "default" : "outline"}
+                      className={`w-full justify-start ${
+                        selectedEmployee === conversation.employeeId 
+                          ? 'bg-white/20 text-white' 
+                          : 'border-white/20 text-white hover:bg-white/10'
                       }`}
-                      onClick={() => setSelectedEmployee(conv.employeeId)}
+                      onClick={() => setSelectedEmployee(conversation.employeeId)}
                     >
-                      <div className="flex items-center">
-                        <User className="w-4 h-4 mr-2 text-white/70" />
-                        <span className="text-white">{conv.employeeName}</span>
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          <span>{conversation.employeeName}</span>
+                          {conversation.unreadCount > 0 && (
+                            <Badge variant="destructive" className="ml-1">
+                              {conversation.unreadCount}
+                            </Badge>
+                          )}
+                        </div>
+                        <ChevronRight className="w-4 h-4" />
                       </div>
-                      <div className="flex items-center">
-                        {conv.unreadCount > 0 && (
-                          <Badge variant="destructive" className="mr-2">
-                            {conv.unreadCount}
-                          </Badge>
-                        )}
-                        <ChevronRight className="w-4 h-4 text-white/50" />
-                      </div>
-                    </div>
+                    </Button>
                   ))}
                 </div>
               </div>
               
-              <div className="bg-white/5 rounded-lg border border-white/10 p-4 md:col-span-2 max-h-[600px] overflow-y-auto">
-                {selectedEmployee ? (
-                  <>
-                    <div className="font-medium text-white mb-4 pb-2 border-b border-white/10">
-                      {selectedEmployee === "all_employees" ? (
-                        <div className="flex items-center">
-                          <Users className="w-5 h-5 mr-2" />
-                          <span>All Employees Broadcast</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center">
-                          <User className="w-5 h-5 mr-2" />
-                          <span>
-                            {employees.find(emp => emp.employeeId === selectedEmployee)?.name || "Employee"}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <AnimatePresence>
-                      {selectedEmployee === "all_employees" ? (
-                        allEmployeesMessages.length > 0 ? (
-                          allEmployeesMessages.map((message, index) => renderMessageItem(message, index))
+              <div className="md:col-span-2 bg-white/5 rounded-lg p-4 border border-white/10">
+                <AnimatePresence mode="wait">
+                  {selectedEmployee === null ? (
+                    <motion.div
+                      key="all-messages"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="space-y-4"
+                    >
+                      <h3 className="text-lg font-medium text-white mb-3">
+                        Messages to All Employees
+                      </h3>
+                      
+                      <div className="max-h-[500px] overflow-y-auto pr-2">
+                        {allEmployeesMessages.length === 0 ? (
+                          <div className="text-center p-6 text-white/70">
+                            No messages sent to all employees
+                          </div>
                         ) : (
-                          <div className="text-center text-white/50 py-8">
-                            No broadcast messages found
-                          </div>
-                        )
-                      ) : (
-                        conversations.find(c => c.employeeId === selectedEmployee)?.messages.map((message, index) => 
-                          renderMessageItem(message, index)
-                        ) || (
-                          <div className="text-center text-white/50 py-8">
-                            No conversation history found
-                          </div>
-                        )
-                      )}
-                    </AnimatePresence>
-                    
-                    {selectedEmployee !== "all_employees" && (
-                      <div className="mt-4 pt-4 border-t border-white/10">
-                        <form 
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            if (newMessage.message.trim()) {
-                              setNewMessage(prev => ({
-                                ...prev,
-                                recipientId: selectedEmployee || "all_employees"
-                              }));
-                              handleCreateMessage(e);
-                            }
-                          }}
-                          className="flex gap-2"
-                        >
+                          allEmployeesMessages.map((message, index) => 
+                            renderMessageItem(message, index)
+                          )
+                        )}
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key={`employee-${selectedEmployee}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="space-y-4"
+                    >
+                      <h3 className="text-lg font-medium text-white mb-3">
+                        Conversation with {
+                          conversations.find(c => c.employeeId === selectedEmployee)?.employeeName
+                        }
+                      </h3>
+                      
+                      <div className="max-h-[500px] overflow-y-auto pr-2">
+                        {conversations.find(c => c.employeeId === selectedEmployee)?.messages.map(
+                          (message, index) => renderMessageItem(message, index)
+                        )}
+                      </div>
+                      
+                      <form onSubmit={handleCreateMessage} className="pt-4 border-t border-white/10">
+                        <div className="flex gap-2">
                           <textarea
                             name="message"
-                            placeholder={`Message to ${
-                              employees.find(emp => emp.employeeId === selectedEmployee)?.name || "Employee"
-                            }...`}
                             value={newMessage.message}
                             onChange={handleMessageInputChange}
-                            className="flex h-12 w-full rounded-md border bg-white/10 border-white/20 px-3 py-2 text-base text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 md:text-sm"
+                            placeholder="Type your reply..."
+                            className="flex-1 p-2 rounded-md bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                            rows={1}
+                            required
                           />
-                          
                           <Button 
                             type="submit" 
-                            className="bg-white/20 hover:bg-white/30 text-white border-0 h-12"
-                            disabled={!newMessage.message.trim()}
+                            className="bg-white/20 hover:bg-white/30 text-white"
                           >
                             <Send className="w-4 h-4" />
                           </Button>
-                        </form>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center text-white/50 py-8">
-                    Select a conversation from the list
-                  </div>
-                )}
+                        </div>
+                      </form>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </TabsContent>

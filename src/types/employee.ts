@@ -64,6 +64,7 @@ export interface Message {
   timestamp?: Timestamp;
   recipientId?: string;
   reply?: MessageReply;
+  read?: boolean;
 }
 
 export interface AttendanceSummary {
