@@ -197,9 +197,13 @@ const EmployeePanel = () => {
     
     const now = Timestamp.now();
     try {
+      // Calculate the final accumulated break time
+      let finalAccumulatedBreakMs = accumulatedBreakMs;
+      
       if (currentBreakStartTime && employeeStatus.status !== "Working" && employeeStatus.status !== "Clocked Out") {
         const currentBreakTime = Date.now() - currentBreakStartTime.getTime();
-        setAccumulatedBreakMs(prev => prev + currentBreakTime);
+        finalAccumulatedBreakMs += currentBreakTime;
+        setAccumulatedBreakMs(finalAccumulatedBreakMs);
       }
 
       const attendanceRecord = {
@@ -209,7 +213,7 @@ const EmployeePanel = () => {
         clockInTime: clockInTime ? Timestamp.fromDate(clockInTime) : null,
         clockOutTime: now,
         totalClockTime: clockInTime ? Date.now() - clockInTime.getTime() : 0,
-        accumulatedBreak: accumulatedBreakMs,
+        accumulatedBreak: finalAccumulatedBreakMs,
         isLate,
         lateMinutes,
         isOvertime,
