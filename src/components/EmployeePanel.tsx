@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
+import {
   collection,
   query,
   where,
@@ -58,7 +58,7 @@ const EmployeePanel = () => {
   const [isOvertime, setIsOvertime] = useState(false);
   const [overtimeMinutes, setOvertimeMinutes] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
-  
+
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioRef2 = useRef<HTMLAudioElement>(null);
   const statusUnsubscribeRef = useRef<(() => void) | undefined>();
@@ -87,7 +87,7 @@ const EmployeePanel = () => {
   useEffect(() => {
     if (initialEmployee?.employeeId) {
       localStorage.setItem(
-        `accumulatedBreak_${initialEmployee.employeeId}`, 
+        `accumulatedBreak_${initialEmployee.employeeId}`,
         accumulatedBreakMs.toString()
       );
     }
@@ -99,7 +99,7 @@ const EmployeePanel = () => {
       if (storedLateStatus) {
         const lateStatus: LateStatus = JSON.parse(storedLateStatus);
         const today = new Date().toDateString();
-        
+
         if (lateStatus.date === today) {
           setIsLate(lateStatus.isLate);
           setLateMinutes(lateStatus.lateMinutes);
@@ -116,13 +116,13 @@ const EmployeePanel = () => {
     const now = new Date();
     const [startHour, startMinute] = currentDepartment.schedule.clockIn.split(':');
     const [endHour, endMinute] = currentDepartment.schedule.clockOut.split(':');
-    
+
     const scheduleStart = new Date();
     scheduleStart.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
-    
+
     const scheduleEnd = new Date();
     scheduleEnd.setHours(parseInt(endHour), parseInt(endMinute), 0, 0);
-    
+
     return now >= scheduleStart && now <= scheduleEnd;
   }, [currentDepartment]);
 
@@ -136,35 +136,41 @@ const EmployeePanel = () => {
 
   const clockIn = async () => {
     if (!initialEmployee?.employeeId) return;
-    
+
     const now = Timestamp.now();
     setClockInTime(now.toDate());
+    // Reset break time variables
+    setBreakTimer("00:00:00");
+    setAccumulatedBreakMs(0);
+    setCurrentBreakStartTime(null);
+    localStorage.removeItem(`accumulatedBreak_${initialEmployee.employeeId}`);
+
     try {
       await addDoc(collection(db, "attendance"), {
         employeeId: initialEmployee.employeeId,
         eventType: "clockIn",
         timestamp: now
       });
-      
+
       const initialStatus = isWithinSchedule() ? "Working" : "Standby";
-      const newStatus = { 
-        status: initialStatus, 
+      const newStatus = {
+        status: initialStatus,
         stateStartTime: now,
         employeeId: initialEmployee.employeeId,
         clockInTime: now
       };
       await setDoc(doc(db, "status", initialEmployee.employeeId), newStatus);
       setEmployeeStatus(newStatus);
-      
+
       if (currentDepartment) {
         const [scheduleHour, scheduleMinute] = currentDepartment.schedule.clockIn.split(':');
         const scheduleTime = new Date();
         scheduleTime.setHours(parseInt(scheduleHour), parseInt(scheduleMinute), 0, 0);
-        
+
         const clockInMs = now.toDate().getTime();
         const scheduleMs = scheduleTime.getTime();
         const diffMinutes = Math.floor((clockInMs - scheduleMs) / (1000 * 60));
-        
+
         if (diffMinutes > currentDepartment.schedule.gracePeriod) {
           const lateStatus: LateStatus = {
             isLate: true,
@@ -172,7 +178,7 @@ const EmployeePanel = () => {
             date: new Date().toDateString()
           };
           localStorage.setItem(`lateStatus_${initialEmployee.employeeId}`, JSON.stringify(lateStatus));
-          
+
           setIsLate(true);
           setLateMinutes(diffMinutes);
           toast({
@@ -194,12 +200,12 @@ const EmployeePanel = () => {
 
   const clockOut = async () => {
     if (!initialEmployee?.employeeId) return;
-    
+
     const now = Timestamp.now();
     try {
       // Calculate the final accumulated break time
       let finalAccumulatedBreakMs = accumulatedBreakMs;
-      
+
       if (currentBreakStartTime && employeeStatus.status !== "Working" && employeeStatus.status !== "Clocked Out") {
         const currentBreakTime = Date.now() - currentBreakStartTime.getTime();
         finalAccumulatedBreakMs += currentBreakTime;
@@ -222,6 +228,7 @@ const EmployeePanel = () => {
       };
 
       await addDoc(collection(db, "attendance"), attendanceRecord);
+      // Create attendance summary
       await addDoc(collection(db, "attendanceSummary"), {
         ...attendanceRecord,
         date: now
@@ -233,14 +240,14 @@ const EmployeePanel = () => {
       setClockInTimer("00:00:00");
       setBreakTimer("00:00:00");
       setCurrentBreakStartTime(null);
-      
+
       localStorage.removeItem(`accumulatedBreak_${initialEmployee.employeeId}`);
       setAccumulatedBreakMs(0);
-      
+
       localStorage.removeItem(`lateStatus_${initialEmployee.employeeId}`);
       setIsLate(false);
       setLateMinutes(0);
-      
+
       setIsOvertime(false);
       setOvertimeMinutes(0);
 
@@ -260,7 +267,7 @@ const EmployeePanel = () => {
 
   const toggleBreak = async (breakType: string) => {
     if (!initialEmployee?.employeeId || !clockInTime) return;
-    
+
     const now = Timestamp.now();
     try {
       if (employeeStatus.status === "Working") {
@@ -270,8 +277,8 @@ const EmployeePanel = () => {
           eventType: "start_" + breakType.replace(/ /g, ""),
           timestamp: now
         });
-        const newStatus = { 
-          status: breakType, 
+        const newStatus = {
+          status: breakType,
           stateStartTime: now,
           employeeId: initialEmployee.employeeId,
           clockInTime: Timestamp.fromDate(clockInTime)
@@ -284,14 +291,14 @@ const EmployeePanel = () => {
           const currentBreakTime = Date.now() - currentBreakStartTime.getTime();
           setAccumulatedBreakMs(prev => prev + currentBreakTime);
         }
-        
+
         await addDoc(collection(db, "attendance"), {
           employeeId: initialEmployee.employeeId,
           eventType: "end_" + breakType.replace(/ /g, ""),
           timestamp: now
         });
-        const newStatus = { 
-          status: isWithinSchedule() ? "Working" : "Standby", 
+        const newStatus = {
+          status: isWithinSchedule() ? "Working" : "Standby",
           stateStartTime: now,
           employeeId: initialEmployee.employeeId,
           clockInTime: Timestamp.fromDate(clockInTime)
@@ -312,7 +319,7 @@ const EmployeePanel = () => {
 
   const toggleStandby = async () => {
     if (!initialEmployee?.employeeId || !clockInTime) return;
-    
+
     const now = Timestamp.now();
     try {
       if (employeeStatus.status === "Working") {
@@ -321,8 +328,8 @@ const EmployeePanel = () => {
           eventType: "start_standby",
           timestamp: now
         });
-        const newStatus = { 
-          status: "Standby", 
+        const newStatus = {
+          status: "Standby",
           stateStartTime: now,
           employeeId: initialEmployee.employeeId,
           clockInTime: Timestamp.fromDate(clockInTime)
@@ -335,8 +342,8 @@ const EmployeePanel = () => {
           eventType: "end_standby",
           timestamp: now
         });
-        const newStatus = { 
-          status: "Working", 
+        const newStatus = {
+          status: "Working",
           stateStartTime: now,
           employeeId: initialEmployee.employeeId,
           clockInTime: Timestamp.fromDate(clockInTime)
@@ -356,7 +363,7 @@ const EmployeePanel = () => {
 
   const resumeWorking = async () => {
     if (!initialEmployee?.employeeId || !clockInTime) return;
-    
+
     const now = Timestamp.now();
     try {
       await addDoc(collection(db, "attendance"), {
@@ -408,8 +415,8 @@ const EmployeePanel = () => {
     if (employeeStatus.status === "Working") {
       return { visible: true, active: false, disabled: false };
     }
-    return { 
-      visible: true, 
+    return {
+      visible: true,
       active: employeeStatus.status === breakType,
       disabled: employeeStatus.status !== breakType
     };
@@ -417,7 +424,7 @@ const EmployeePanel = () => {
 
   const fetchAttendanceSummaries = async () => {
     if (!initialEmployee?.employeeId) return;
-    
+
     setIsLoading(true);
     try {
       const q = query(
@@ -434,7 +441,7 @@ const EmployeePanel = () => {
       });
       summaries.sort((a, b) => b.date.seconds - a.date.seconds);
       setAttendanceSummaries(summaries);
-      
+
       toast({
         title: "Success",
         description: "Attendance summary refreshed",
@@ -454,10 +461,10 @@ const EmployeePanel = () => {
 
   const fetchAttendanceHistory = useCallback(async () => {
     if (!initialEmployee?.employeeId) return;
-    
+
     try {
       const q = query(
-        collection(db, "attendance"), 
+        collection(db, "attendance"),
         where("employeeId", "==", initialEmployee.employeeId)
       );
       const querySnapshot = await getDocs(q);
@@ -517,14 +524,14 @@ const EmployeePanel = () => {
               duration: 5000,
             });
           }
-          
+
           setEmployeeStatus({
             status: data.status || "Clocked Out",
             stateStartTime: data.stateStartTime || null,
             employeeId: data.employeeId,
             clockInTime: data.clockInTime
           });
-          
+
           if (data.clockInTime) {
             setClockInTime(data.clockInTime.toDate());
           }
@@ -547,16 +554,16 @@ const EmployeePanel = () => {
           const [scheduleHour, scheduleMinute] = currentDepartment.schedule.clockOut.split(':');
           const scheduleTime = new Date();
           scheduleTime.setHours(parseInt(scheduleHour), parseInt(scheduleMinute), 0, 0);
-          
+
           const diffMinutes = Math.floor((now.getTime() - scheduleTime.getTime()) / (1000 * 60));
-          
+
           if (diffMinutes > currentDepartment.schedule.overtimeThreshold) {
             setIsOvertime(true);
             setOvertimeMinutes(diffMinutes);
           }
         }
       }
-      
+
       if (
         employeeStatus.status !== "Working" &&
         employeeStatus.status !== "Clocked Out" &&
@@ -578,7 +585,7 @@ const EmployeePanel = () => {
   useEffect(() => {
     const fetchDepartmentInfo = async () => {
       if (!initialEmployee?.department) return;
-      
+
       try {
         const departmentDoc = await getDoc(doc(db, "departments", initialEmployee.department));
         if (departmentDoc.exists()) {
@@ -650,8 +657,8 @@ const EmployeePanel = () => {
       <audio ref={audioRef} src="/buzz.wav" />
       <audio ref={audioRef2} src="/buzz2.wav" />
       <div className="relative min-h-screen flex flex-col">
-        <Header 
-          currentEmployee={initialEmployee} 
+        <Header
+          currentEmployee={initialEmployee}
           onLogout={handleLogout}
         />
 
@@ -670,8 +677,8 @@ const EmployeePanel = () => {
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Messages
                 {unreadMessageCount > 0 && (
-                  <Badge 
-                    variant="destructive" 
+                  <Badge
+                    variant="destructive"
                     className="absolute -top-2 -right-2 px-1.5 py-0.5 min-w-[1.5rem] h-5 flex items-center justify-center text-xs"
                   >
                     {unreadMessageCount}
@@ -715,7 +722,7 @@ const EmployeePanel = () => {
 
             <TabsContent value="messages">
               {initialEmployee && (
-                <EmployeeMessages 
+                <EmployeeMessages
                   employeeId={initialEmployee.employeeId}
                   employeeName={initialEmployee.name}
                 />
