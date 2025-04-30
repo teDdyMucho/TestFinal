@@ -25,6 +25,7 @@ import { AttendanceSummaryCard } from "./employee/AttendanceSummaryCard";
 import { HistoryCard } from "./employee/HistoryCard";
 import EmployeeMessages from "./EmployeeMessages";
 import { formatTime } from "@/utils/formatTime";
+import { getStorageItem, setStorageItem, getEmployeeStorageItem, setEmployeeStorageItem, removeStorageItem, removeEmployeeStorageItem } from "@/utils/localStorage";
 import { checkAndUpdateDepartmentStatus } from '@/lib/scheduleChecker';
 import { Badge } from "@/components/ui/badge";
 
@@ -35,16 +36,14 @@ interface LateStatus {
 }
 
 const EmployeePanel = () => {
-  const storedEmployee = localStorage.getItem("currentEmployee");
-  const initialEmployee = storedEmployee ? JSON.parse(storedEmployee) : null;
+  const initialEmployee = getStorageItem("currentEmployee", null);
   const [employeeStatus, setEmployeeStatus] = useState<EmployeeStatus>({ status: "Clocked Out", stateStartTime: null });
   const [clockInTime, setClockInTime] = useState<Date | null>(null);
   const [clockInTimer, setClockInTimer] = useState("00:00:00");
   const [breakTimer, setBreakTimer] = useState("00:00:00");
   const [accumulatedBreakMs, setAccumulatedBreakMs] = useState(() => {
     if (initialEmployee?.employeeId) {
-      const stored = localStorage.getItem(`accumulatedBreak_${initialEmployee.employeeId}`);
-      return stored ? parseInt(stored, 10) : 0;
+      return getEmployeeStorageItem(initialEmployee.employeeId, "accumulatedBreak", 0);
     }
     return 0;
   });
@@ -60,7 +59,6 @@ const EmployeePanel = () => {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement>(null);
-  const audioRef2 = useRef<HTMLAudioElement>(null);
   const statusUnsubscribeRef = useRef<(() => void) | undefined>();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -86,25 +84,21 @@ const EmployeePanel = () => {
 
   useEffect(() => {
     if (initialEmployee?.employeeId) {
-      localStorage.setItem(
-        `accumulatedBreak_${initialEmployee.employeeId}`,
-        accumulatedBreakMs.toString()
-      );
+      setEmployeeStorageItem(initialEmployee.employeeId, "accumulatedBreak", accumulatedBreakMs);
     }
   }, [accumulatedBreakMs, initialEmployee?.employeeId]);
 
   useEffect(() => {
     if (initialEmployee?.employeeId) {
-      const storedLateStatus = localStorage.getItem(`lateStatus_${initialEmployee.employeeId}`);
-      if (storedLateStatus) {
-        const lateStatus: LateStatus = JSON.parse(storedLateStatus);
+      const lateStatus = getEmployeeStorageItem<LateStatus | null>(initialEmployee.employeeId, "lateStatus", null);
+      if (lateStatus) {
         const today = new Date().toDateString();
 
         if (lateStatus.date === today) {
           setIsLate(lateStatus.isLate);
           setLateMinutes(lateStatus.lateMinutes);
         } else {
-          localStorage.removeItem(`lateStatus_${initialEmployee.employeeId}`);
+          removeEmployeeStorageItem(initialEmployee.employeeId, "lateStatus");
         }
       }
     }
@@ -130,7 +124,7 @@ const EmployeePanel = () => {
     if (statusUnsubscribeRef.current) {
       statusUnsubscribeRef.current();
     }
-    localStorage.removeItem("currentEmployee");
+    removeStorageItem("currentEmployee");
     navigate("/");
   }, [navigate]);
 
@@ -143,7 +137,7 @@ const EmployeePanel = () => {
     setBreakTimer("00:00:00");
     setAccumulatedBreakMs(0);
     setCurrentBreakStartTime(null);
-    localStorage.removeItem(`accumulatedBreak_${initialEmployee.employeeId}`);
+    removeEmployeeStorageItem(initialEmployee.employeeId, "accumulatedBreak");
 
     try {
       await addDoc(collection(db, "attendance"), {
@@ -177,7 +171,7 @@ const EmployeePanel = () => {
             lateMinutes: diffMinutes,
             date: new Date().toDateString()
           };
-          localStorage.setItem(`lateStatus_${initialEmployee.employeeId}`, JSON.stringify(lateStatus));
+          setEmployeeStorageItem(initialEmployee.employeeId, "lateStatus", lateStatus);
 
           setIsLate(true);
           setLateMinutes(diffMinutes);
@@ -241,10 +235,10 @@ const EmployeePanel = () => {
       setBreakTimer("00:00:00");
       setCurrentBreakStartTime(null);
 
-      localStorage.removeItem(`accumulatedBreak_${initialEmployee.employeeId}`);
+      removeEmployeeStorageItem(initialEmployee.employeeId, "accumulatedBreak");
       setAccumulatedBreakMs(0);
 
-      localStorage.removeItem(`lateStatus_${initialEmployee.employeeId}`);
+      removeEmployeeStorageItem(initialEmployee.employeeId, "lateStatus");
       setIsLate(false);
       setLateMinutes(0);
 
@@ -655,7 +649,6 @@ const EmployeePanel = () => {
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600">
       <audio ref={audioRef} src="/buzz.wav" />
-      <audio ref={audioRef2} src="/buzz2.wav" />
       <div className="relative min-h-screen flex flex-col">
         <Header
           currentEmployee={initialEmployee}
