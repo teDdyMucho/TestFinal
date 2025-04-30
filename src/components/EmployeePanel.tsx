@@ -25,7 +25,7 @@ import { AttendanceSummaryCard } from "./employee/AttendanceSummaryCard";
 import { HistoryCard } from "./employee/HistoryCard";
 import EmployeeMessages from "./EmployeeMessages";
 import { formatTime } from "@/utils/formatTime";
-import { getStorageItem, setStorageItem, getEmployeeStorageItem, setEmployeeStorageItem, removeStorageItem, removeEmployeeStorageItem } from "@/utils/localStorage";
+import { getStorageItem, getEmployeeStorageItem, setEmployeeStorageItem, removeStorageItem, removeEmployeeStorageItem } from "@/utils/localStorage";
 import { checkAndUpdateDepartmentStatus } from '@/lib/scheduleChecker';
 import { Badge } from "@/components/ui/badge";
 
@@ -36,7 +36,7 @@ interface LateStatus {
 }
 
 const EmployeePanel = () => {
-  const initialEmployee = getStorageItem("currentEmployee", null);
+  const initialEmployee = getStorageItem<{employeeId: string; name: string; department: string; isAdmin: boolean} | null>("currentEmployee", null);
   const [employeeStatus, setEmployeeStatus] = useState<EmployeeStatus>({ status: "Clocked Out", stateStartTime: null });
   const [clockInTime, setClockInTime] = useState<Date | null>(null);
   const [clockInTimer, setClockInTimer] = useState("00:00:00");
