@@ -232,7 +232,8 @@ const EmployeePanel = () => {
         timestamp: now,
         clockInTime: clockInTime ? Timestamp.fromDate(clockInTime) : null,
         clockOutTime: now,
-        totalClockTime: clockInTime ? Date.now() - clockInTime.getTime() : 0,
+        // Use synchronized time for total clock time calculation
+        totalClockTime: clockInTime ? getNYTime().getTime() - clockInTime.getTime() : 0,
         accumulatedBreak: finalAccumulatedBreakMs,
         isLate,
         lateMinutes,
@@ -302,7 +303,9 @@ const EmployeePanel = () => {
         setCurrentBreakStartTime(now.toDate());
       } else if (employeeStatus.status === breakType) {
         if (currentBreakStartTime) {
-          const currentBreakTime = Date.now() - currentBreakStartTime.getTime();
+          // Use synchronized time for break calculations instead of local Date.now()
+          const now = getNYTime();
+          const currentBreakTime = now.getTime() - currentBreakStartTime.getTime();
           setAccumulatedBreakMs(prev => prev + currentBreakTime);
         }
 
@@ -584,6 +587,7 @@ const EmployeePanel = () => {
         employeeStatus.status !== "Clocked Out" &&
         currentBreakStartTime
       ) {
+        // Use synchronized time for break calculations
         const currentBreak = now.getTime() - currentBreakStartTime.getTime();
         setBreakTimer(formatTime(currentBreak));
       }

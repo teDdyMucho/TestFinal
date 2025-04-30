@@ -1,6 +1,7 @@
 import { collection, query, where, getDocs, doc, updateDoc, Timestamp, deleteDoc, addDoc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { Department, Employee, EmployeeStatus } from '@/types/employee';
+import { getNYTime, getNYTimestamp } from '@/utils/timeSync';
 
 export async function checkAndUpdateDepartmentStatus() {
   try {
@@ -11,7 +12,8 @@ export async function checkAndUpdateDepartmentStatus() {
       departments.push({ id: doc.id, ...doc.data() } as Department);
     });
 
-    const now = new Date();
+    // Use synchronized New York time instead of local computer time
+    const now = getNYTime();
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
     // Check each department's schedule
@@ -63,12 +65,14 @@ export async function checkAndUpdateDepartmentStatus() {
 
             if (statusDoc.exists()) {
               const currentStatus = statusDoc.data() as EmployeeStatus;
-              const now = Timestamp.now();
+              // Use synchronized NY time
+              const now = getNYTimestamp();
 
               // Only clock out if the employee is not already clocked out
               if (currentStatus.status !== "Clocked Out") {
                 // Check if there's already a clock-out record for today
-                const today = new Date();
+                // Use synchronized NY time
+                const today = getNYTime();
                 today.setHours(0, 0, 0, 0);
                 const tomorrow = new Date(today);
                 tomorrow.setDate(tomorrow.getDate() + 1);
@@ -99,7 +103,7 @@ export async function checkAndUpdateDepartmentStatus() {
                   const storedLateStatus = localStorage.getItem(`lateStatus_${employee.employeeId}`);
                   if (storedLateStatus) {
                     const lateStatus = JSON.parse(storedLateStatus);
-                    if (lateStatus.date === new Date().toDateString()) {
+                    if (lateStatus.date === getNYTime().toDateString()) {
                       isLate = lateStatus.isLate;
                       lateMinutes = lateStatus.lateMinutes;
                     }
@@ -111,11 +115,12 @@ export async function checkAndUpdateDepartmentStatus() {
 
                   // Check if overtime
                   const [scheduleEndHour, scheduleEndMinute] = department.schedule.clockOut.split(':');
-                  const scheduleEndTime = new Date();
+                  // Use synchronized NY time for schedule calculations
+                  const scheduleEndTime = getNYTime();
                   scheduleEndTime.setHours(parseInt(scheduleEndHour), parseInt(scheduleEndMinute), 0, 0);
 
                   const [scheduleStartHour, scheduleStartMinute] = department.schedule.clockIn.split(':');
-                  const scheduleStartTime = new Date();
+                  const scheduleStartTime = getNYTime();
                   scheduleStartTime.setHours(parseInt(scheduleStartHour), parseInt(scheduleStartMinute), 0, 0);
 
                   const scheduledWorkMs = scheduleEndTime.getTime() - scheduleStartTime.getTime();

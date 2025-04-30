@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Department, EmployeeStatus } from "@/types/employee";
 import { formatTime } from "@/utils/formatTime";
+import { getNYTime } from "@/utils/timeSync";
 import { useEffect, useState, useRef } from "react";
 import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -40,7 +41,8 @@ interface StatusCardProps {
 
 const formatScheduleTime = (time: string) => {
   const [hours, minutes] = time.split(':');
-  const date = new Date();
+  // Use synchronized NY time instead of local time
+  const date = getNYTime();
   date.setHours(parseInt(hours, 10), parseInt(minutes, 10));
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 };
@@ -162,11 +164,13 @@ export function StatusCard({
       
       // Set up new timer for automatic clock out
       const [hours, minutes] = currentDepartment.schedule.clockOut.split(':');
-      const clockOutTime = new Date();
+      // Use synchronized NY time instead of local time
+      const clockOutTime = getNYTime();
       clockOutTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
       
       // If the time has already passed today, don't set a timer
-      const now = new Date();
+      // Use synchronized NY time instead of local time
+      const now = getNYTime();
       if (clockOutTime <= now) {
         return;
       }
