@@ -26,6 +26,7 @@ import { HistoryCard } from "./employee/HistoryCard";
 import EmployeeMessages from "./EmployeeMessages";
 import { formatTime } from "@/utils/formatTime";
 import { getStorageItem, getEmployeeStorageItem, setEmployeeStorageItem, removeStorageItem, removeEmployeeStorageItem } from "@/utils/localStorage";
+import { getNYTime, getNYTimestamp, syncTimeWithServer, checkAndResync } from "@/utils/timeSync";
 import { checkAndUpdateDepartmentStatus } from '@/lib/scheduleChecker';
 import { Badge } from "@/components/ui/badge";
 
@@ -62,8 +63,21 @@ const EmployeePanel = () => {
   const statusUnsubscribeRef = useRef<(() => void) | undefined>();
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Sync time with server when component loads
+  useEffect(() => {
+    // Initial time sync
+    syncTimeWithServer().catch(console.error);
+    
+    // Set up periodic time sync every 15 minutes
+    const syncInterval = setInterval(() => {
+      syncTimeWithServer().catch(console.error);
+    }, 15 * 60 * 1000);
+    
+    return () => clearInterval(syncInterval);
+  }, []);
 
-  // Add sound interval effect
+  // Set up timer intervals
   useEffect(() => {
     let soundInterval: NodeJS.Timeout;
 
@@ -92,7 +106,7 @@ const EmployeePanel = () => {
     if (initialEmployee?.employeeId) {
       const lateStatus = getEmployeeStorageItem<LateStatus | null>(initialEmployee.employeeId, "lateStatus", null);
       if (lateStatus) {
-        const today = new Date().toDateString();
+        const today = getNYTime().toDateString();
 
         if (lateStatus.date === today) {
           setIsLate(lateStatus.isLate);
@@ -107,14 +121,14 @@ const EmployeePanel = () => {
   const isWithinSchedule = useCallback(() => {
     if (!currentDepartment) return true;
 
-    const now = new Date();
+    const now = getNYTime();
     const [startHour, startMinute] = currentDepartment.schedule.clockIn.split(':');
     const [endHour, endMinute] = currentDepartment.schedule.clockOut.split(':');
 
-    const scheduleStart = new Date();
+    const scheduleStart = getNYTime();
     scheduleStart.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
 
-    const scheduleEnd = new Date();
+    const scheduleEnd = getNYTime();
     scheduleEnd.setHours(parseInt(endHour), parseInt(endMinute), 0, 0);
 
     return now >= scheduleStart && now <= scheduleEnd;
@@ -131,7 +145,10 @@ const EmployeePanel = () => {
   const clockIn = async () => {
     if (!initialEmployee?.employeeId) return;
 
-    const now = Timestamp.now();
+    // Ensure time is synced with server before clock in
+    await checkAndResync();
+    
+    const now = getNYTimestamp();
     setClockInTime(now.toDate());
     // Reset break time variables
     setBreakTimer("00:00:00");
@@ -158,7 +175,7 @@ const EmployeePanel = () => {
 
       if (currentDepartment) {
         const [scheduleHour, scheduleMinute] = currentDepartment.schedule.clockIn.split(':');
-        const scheduleTime = new Date();
+        const scheduleTime = getNYTime();
         scheduleTime.setHours(parseInt(scheduleHour), parseInt(scheduleMinute), 0, 0);
 
         const clockInMs = now.toDate().getTime();
@@ -169,7 +186,7 @@ const EmployeePanel = () => {
           const lateStatus: LateStatus = {
             isLate: true,
             lateMinutes: diffMinutes,
-            date: new Date().toDateString()
+            date: getNYTime().toDateString()
           };
           setEmployeeStorageItem(initialEmployee.employeeId, "lateStatus", lateStatus);
 
@@ -195,7 +212,10 @@ const EmployeePanel = () => {
   const clockOut = async () => {
     if (!initialEmployee?.employeeId) return;
 
-    const now = Timestamp.now();
+    // Ensure time is synced with server before clock out
+    await checkAndResync();
+    
+    const now = getNYTimestamp();
     try {
       // Calculate the final accumulated break time
       let finalAccumulatedBreakMs = accumulatedBreakMs;
@@ -262,7 +282,7 @@ const EmployeePanel = () => {
   const toggleBreak = async (breakType: string) => {
     if (!initialEmployee?.employeeId || !clockInTime) return;
 
-    const now = Timestamp.now();
+    const now = getNYTimestamp();
     try {
       if (employeeStatus.status === "Working") {
         setBreakTimer("00:00:00");
@@ -314,7 +334,7 @@ const EmployeePanel = () => {
   const toggleStandby = async () => {
     if (!initialEmployee?.employeeId || !clockInTime) return;
 
-    const now = Timestamp.now();
+    const now = getNYTimestamp();
     try {
       if (employeeStatus.status === "Working") {
         await addDoc(collection(db, "attendance"), {
@@ -358,7 +378,7 @@ const EmployeePanel = () => {
   const resumeWorking = async () => {
     if (!initialEmployee?.employeeId || !clockInTime) return;
 
-    const now = Timestamp.now();
+    const now = getNYTimestamp();
     try {
       await addDoc(collection(db, "attendance"), {
         employeeId: initialEmployee.employeeId,
@@ -539,14 +559,15 @@ const EmployeePanel = () => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const now = new Date();
+      // Use synchronized New York time instead of local computer time
+      const now = getNYTime();
       if (clockInTime) {
         const diffOverall = now.getTime() - clockInTime.getTime();
         setClockInTimer(formatTime(diffOverall));
 
         if (currentDepartment && employeeStatus.status === "Working") {
           const [scheduleHour, scheduleMinute] = currentDepartment.schedule.clockOut.split(':');
-          const scheduleTime = new Date();
+          const scheduleTime = getNYTime();
           scheduleTime.setHours(parseInt(scheduleHour), parseInt(scheduleMinute), 0, 0);
 
           const diffMinutes = Math.floor((now.getTime() - scheduleTime.getTime()) / (1000 * 60));
