@@ -41,6 +41,7 @@ const EmployeePanel = () => {
   const [employeeStatus, setEmployeeStatus] = useState<EmployeeStatus>({ status: "Clocked Out", stateStartTime: null });
   const [clockInTime, setClockInTime] = useState<Date | null>(null);
   const [clockInTimer, setClockInTimer] = useState("00:00:00");
+  const clockInIntervalRef = useRef<NodeJS.Timeout | null>(null); // Ref to hold timer interval
   const [breakTimer, setBreakTimer] = useState("00:00:00");
   const [accumulatedBreakMs, setAccumulatedBreakMs] = useState(() => {
     if (initialEmployee?.employeeId) {
@@ -150,6 +151,7 @@ const EmployeePanel = () => {
     
     const now = getNYTimestamp();
     setClockInTime(now.toDate());
+    setClockInTimer("00:00:00"); // Ensure timer resets visually on clock-in
     // Reset break time variables
     setBreakTimer("00:00:00");
     setAccumulatedBreakMs(0);
@@ -253,6 +255,10 @@ const EmployeePanel = () => {
       await deleteDoc(doc(db, "status", initialEmployee.employeeId));
       setClockInTime(null);
       setClockInTimer("00:00:00");
+      if (clockInIntervalRef.current) {
+        clearInterval(clockInIntervalRef.current);
+        clockInIntervalRef.current = null;
+      }
       setBreakTimer("00:00:00");
       setCurrentBreakStartTime(null);
 
@@ -561,44 +567,53 @@ const EmployeePanel = () => {
   }, [initialEmployee?.employeeId]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      // Use synchronized New York time instead of local computer time
-      const now = getNYTime();
-      if (clockInTime) {
-        const diffOverall = now.getTime() - clockInTime.getTime();
-        setClockInTimer(formatTime(diffOverall));
+    // Clear any existing interval before starting a new one
+    if (clockInIntervalRef.current) {
+      clearInterval(clockInIntervalRef.current);
+      clockInIntervalRef.current = null;
+    }
+    // Only run timer if clocked in
+    if (clockInTime && employeeStatus.status !== "Clocked Out") {
+      clockInIntervalRef.current = setInterval(() => {
+        const now = getNYTime();
+        if (clockInTime) {
+          const diffOverall = now.getTime() - clockInTime.getTime();
+          setClockInTimer(formatTime(diffOverall));
+          if (currentDepartment && employeeStatus.status === "Working") {
+            const [scheduleHour, scheduleMinute] = currentDepartment.schedule.clockOut.split(':');
+            const scheduleTime = getNYTime();
+            scheduleTime.setHours(parseInt(scheduleHour), parseInt(scheduleMinute), 0, 0);
 
-        if (currentDepartment && employeeStatus.status === "Working") {
-          const [scheduleHour, scheduleMinute] = currentDepartment.schedule.clockOut.split(':');
-          const scheduleTime = getNYTime();
-          scheduleTime.setHours(parseInt(scheduleHour), parseInt(scheduleMinute), 0, 0);
+            const diffMinutes = Math.floor((now.getTime() - scheduleTime.getTime()) / (1000 * 60));
 
-          const diffMinutes = Math.floor((now.getTime() - scheduleTime.getTime()) / (1000 * 60));
-
-          if (diffMinutes > currentDepartment.schedule.overtimeThreshold) {
-            setIsOvertime(true);
-            setOvertimeMinutes(diffMinutes);
+            if (diffMinutes > currentDepartment.schedule.overtimeThreshold) {
+              setIsOvertime(true);
+              setOvertimeMinutes(diffMinutes);
+            }
           }
         }
+        if (
+          employeeStatus.status !== "Working" &&
+          employeeStatus.status !== "Clocked Out" &&
+          currentBreakStartTime
+        ) {
+          const currentBreak = now.getTime() - currentBreakStartTime.getTime();
+          setBreakTimer(formatTime(currentBreak));
+        }
+        if (employeeStatus.status === "Working" && !isWithinSchedule()) {
+          toggleStandby();
+        } else if (employeeStatus.status === "Standby" && isWithinSchedule()) {
+          toggleStandby();
+        }
+      }, 1000);
+    }
+    // Always clear on unmount or dependency change
+    return () => {
+      if (clockInIntervalRef.current) {
+        clearInterval(clockInIntervalRef.current);
+        clockInIntervalRef.current = null;
       }
-
-      if (
-        employeeStatus.status !== "Working" &&
-        employeeStatus.status !== "Clocked Out" &&
-        currentBreakStartTime
-      ) {
-        // Use synchronized time for break calculations
-        const currentBreak = now.getTime() - currentBreakStartTime.getTime();
-        setBreakTimer(formatTime(currentBreak));
-      }
-
-      if (employeeStatus.status === "Working" && !isWithinSchedule()) {
-        toggleStandby();
-      } else if (employeeStatus.status === "Standby" && isWithinSchedule()) {
-        toggleStandby();
-      }
-    }, 1000);
-    return () => clearInterval(interval);
+    };
   }, [clockInTime, employeeStatus, accumulatedBreakMs, currentDepartment, currentBreakStartTime]);
 
   useEffect(() => {
